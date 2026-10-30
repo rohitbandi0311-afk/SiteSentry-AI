@@ -94,20 +94,34 @@ def scan_site(url: str) -> dict:
 
 def gemma_explain(report: dict) -> str:
     api_key = os.getenv('GEMINI_API_KEY')
+
     if not api_key:
-        return 'Gemma AI is not configured yet. Add GEMINI_API_KEY to your .env file to generate an AI explanation. The deterministic scan results above are still available.'
-    client = genai.Client(api_key=api_key)
-    prompt = (
-        'You are SiteSentry AI, a defensive website security assistant. Explain these passive scan '
-        'findings for the site owner. Do not claim that missing headers prove exploitability. '
-        'Prioritize fixes, give concise safe configuration guidance, and clearly state limitations. '
-        'Return clear Markdown. Report:\n' + str(report)
-    )
+        return 'Gemma AI is not configured. Please add GEMINI_API_KEY.'
+
     try:
-        result = client.models.generate_content(model='gemma-4-26b-a4b-it', contents=prompt)
+        client = genai.Client(api_key=api_key)
+
+        prompt = (
+            'You are SiteSentry AI, a defensive website security assistant. '
+            'Explain these passive scan findings for the site owner. '
+            'Do not claim that missing headers prove exploitability. '
+            'Prioritize fixes and give concise, safe configuration guidance. '
+            'Return clear Markdown.\nReport:\n' + str(report)
+        )
+
+        result = client.models.generate_content(
+            model='gemma-4-26b-a4b-it',
+            contents=prompt,
+            config={'http_options': {'timeout': 20000}}
+        )
+
         return result.text or 'Gemma returned an empty response.'
+
     except Exception as exc:
-        return f'Gemma request failed: {type(exc).__name__}. Check your API key, quota, and model access.'
+        return (
+            f'Gemma AI is temporarily unavailable ({type(exc).__name__}). '
+            'The passive scan results are still available.'
+        )
 
 
 @app.get('/')
