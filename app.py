@@ -117,11 +117,12 @@ def gemma_explain(report: dict) -> str:
 
         return result.text or 'Gemma returned an empty response.'
 
-    except Exception as exc:
-        return (
-            f'Gemma AI is temporarily unavailable ({type(exc).__name__}). '
-            'The passive scan results are still available.'
-        )
+   except Exception as exc:
+    print(f'Gemma API error: {type(exc).__name__}: {exc}', flush=True)
+    return (
+        f'Gemma AI is temporarily unavailable ({type(exc).__name__}). '
+        'The passive scan results are still available.'
+    )
 
 
 @app.get('/')
