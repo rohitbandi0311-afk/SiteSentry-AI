@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SiteSentry AI | Website Security</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <nav class="nav"><div class="brand"><span class="brand-mark">S</span> SiteSentry <b>AI</b></div><span class="nav-tag">DEFENSIVE SECURITY WORKSPACE</span></nav>
+  <main class="shell">
+    <section class="hero"><div class="eyebrow">GEMMA 4 · WEBSITE SECURITY ASSISTANT</div><h1>Know your website’s<br><span>security posture.</span></h1><p>Run passive security checks, review evidence-backed findings, and get clear remediation guidance from Gemma 4.</p></section>
+    <section class="scan-card">
+      <label for="url">Website URL</label>
+      <div class="scan-row"><input id="url" type="url" placeholder="https://your-authorized-domain.com"><button id="scanBtn">Scan website <span>↗</span></button></div>
+      <p class="disclaimer">Only scan websites you own or have explicit permission to assess. Passive checks only — no exploitation or intrusive testing.</p>
+    </section>
+    <section id="loading" class="loading hidden">Running passive checks and asking Gemma 4 to explain the results…</section>
+    <section id="error" class="error hidden"></section>
+    <section id="results" class="results hidden">
+      <div class="result-head"><div><div class="eyebrow">SCAN REPORT</div><h2 id="target"></h2></div><div class="status" id="status"></div></div>
+      <div class="metrics"><div><small>FINDINGS</small><strong id="count">0</strong></div><div><small>CHECKS RUN</small><strong id="checks">0</strong></div><div><small>HTTP STATUS</small><strong id="http"></strong></div></div>
+      <h3>Evidence-backed findings</h3><div id="findings"></div>
+      <div class="ai-panel"><div class="ai-title"><span>✦</span><div><b>Gemma 4 Security Analysis</b><small>AI explanation & remediation priorities</small></div></div><div id="aiText" class="ai-text"></div></div>
+      <p class="footnote" id="note"></p>
+    </section>
+    <footer>SiteSentry AI · Built for safer, more understandable web security</footer>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    $('scanBtn').addEventListener('click', async () => {
+      const url = $('url').value.trim();
+      $('error').classList.add('hidden'); $('results').classList.add('hidden');
+      if (!url) { $('error').textContent = 'Enter a website URL to begin.'; $('error').classList.remove('hidden'); return; }
+      $('loading').classList.remove('hidden'); $('scanBtn').disabled = true;
+      try {
+        const response = await fetch('/api/scan', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url})});
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Scan failed.');
+        $('target').textContent = data.url; $('status').textContent = data.findings.length ? 'Review recommended' : 'No configured checks failed';
+        $('count').textContent = data.findings.length; $('checks').textContent = data.checks_run; $('http').textContent = data.status_code;
+        $('findings').innerHTML = '';
+        if (!data.findings.length) $('findings').innerHTML = '<div class="finding"><b>No missing checks detected</b><p>This limited passive scan did not identify issues in the checks performed. It does not certify the website as secure.</p></div>';
+        data.findings.forEach(f => {
+          const card = document.createElement('article'); card.className = 'finding';
+          const title = document.createElement('b'); title.textContent = f.title;
+          const sev = document.createElement('span'); sev.className = 'severity ' + f.severity.toLowerCase(); sev.textContent = f.severity;
+          const evidence = document.createElement('p'); evidence.textContent = 'Evidence: ' + f.evidence;
+          const impact = document.createElement('p'); impact.textContent = 'Why it matters: ' + f.impact;
+          const fix = document.createElement('p'); fix.textContent = 'Suggested fix: ' + f.recommendation;
+          card.append(title, sev, evidence, impact, fix); $('findings').append(card);
+        });
+        $('aiText').textContent = data.ai_explanation; $('note').textContent = data.note;
+        $('results').classList.remove('hidden');
+      } catch (e) { $('error').textContent = e.message; $('error').classList.remove('hidden'); }
+      finally { $('loading').classList.add('hidden'); $('scanBtn').disabled = false; }
+    });
+  </script>
+</body></html>
