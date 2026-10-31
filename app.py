@@ -6,9 +6,9 @@ from urllib.parse import urlparse
 import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
-from google import genai
 
-load_dotenv()
+
+load_dotenv(override=True)
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
 
@@ -92,22 +92,59 @@ def scan_site(url: str) -> dict:
     }
 
 
+
 def gemma_explain(report: dict) -> str:
     api_key = os.getenv('GEMINI_API_KEY')
+
     if not api_key:
-        return 'Gemma AI is not configured yet. Add GEMINI_API_KEY to your .env file to generate an AI explanation. The deterministic scan results above are still available.'
-    client = genai.Client(api_key=api_key)
+        return 'Gemma AI is not configured. Passive scan results are still available.'
+
     prompt = (
-        'You are SiteSentry AI, a defensive website security assistant. Explain these passive scan '
-        'findings for the site owner. Do not claim that missing headers prove exploitability. '
-        'Prioritize fixes, give concise safe configuration guidance, and clearly state limitations. '
-        'Return clear Markdown. Report:\n' + str(report)
+        'You are SiteSentry AI, a defensive website security assistant. '
+        'Explain these passive scan findings for the site owner. '
+        'Prioritize fixes and give safe configuration guidance. '
+        'Do not claim missing headers prove exploitability. '
+        'Clearly state scan limitations.\n\n'
+        + str(report)
     )
+
+    endpoint = (
+        'https://generativelanguage.googleapis.com/v1beta/models/'
+        'gemma-4-26b-a4b-it:generateContent'
+    )
+
     try:
-        result = client.models.generate_content(model='gemma-4-26b-a4b-it', contents=prompt)
-        return result.text or 'Gemma returned an empty response.'
-    except Exception as exc:
-        return f'Gemma request failed: {type(exc).__name__}. Check your API key, quota, and model access.'
+        response = requests.post(
+            endpoint,
+            params={'key': api_key},
+            json={'contents': [{'parts': [{'text': prompt}]}]},
+            timeout=(10, 60)
+        )
+        response.raise_for_status()
+        data = response.json()
+        candidate = data.get('candidates', [{}])[0]
+        parts = candidate.get('content', {}).get('parts', [])
+        text = ''.join(
+            part.get('text', '')
+            for part in parts
+            if part.get('text')
+        )
+        return text or 'Gemma returned an empty response.'
+    except requests.Timeout:
+        return 'Gemma AI timed out. Passive scan results are still available.'
+
+    
+    except requests.RequestException as exc:
+        status = getattr(exc.response, 'status_code', 'unknown')
+        try:
+            details = exc.response.json().get('error', {}).get('message', '')
+        except (ValueError, AttributeError):
+            details = ''
+        return f'Gemma AI request failed (HTTP {status}): {details or type(exc).__name__}'
+
+    except (ValueError, KeyError, IndexError, TypeError):
+        return 'Gemma returned an unexpected response. Please try again.'
+
 
 
 @app.get('/')

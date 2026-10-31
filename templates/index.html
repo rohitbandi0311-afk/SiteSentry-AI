@@ -34,7 +34,11 @@
       $('loading').classList.remove('hidden'); $('scanBtn').disabled = true;
       try {
         const response = await fetch('/api/scan', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url})});
-        const data = await response.json();
+       const contentType = response.headers.get('content-type') || '';
+if (!contentType.includes('application/json')) {
+  throw new Error('Server error. Please try again in a moment.');
+}
+const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Scan failed.');
         $('target').textContent = data.url; $('status').textContent = data.findings.length ? 'Review recommended' : 'No configured checks failed';
         $('count').textContent = data.findings.length; $('checks').textContent = data.checks_run; $('http').textContent = data.status_code;
